@@ -1,9 +1,13 @@
 {-# LANGUAGE Strict #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE BinaryLiterals #-}
+{-# LANGUAGE GADTs #-}
 {-# OPTIONS_GHC -O2 -fllvm #-}
 
-module Data.Image.Qoi.Decoder(decodeQoi) where
+module Data.Image.Qoi.Decoder
+( decodeQoi
+, SomePixels(..)
+) where
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Unsafe as BS
@@ -105,10 +109,16 @@ decodePixels str n = V.create $ do
 
   pure mvec
 
-decodeQoi :: BS.ByteString -> Maybe (Header, V.Vector Pixel3)
+data SomePixels where
+  Pixels3 :: V.Vector Pixel3 -> SomePixels
+  Pixels4 :: V.Vector Pixel4 -> SomePixels
+
+decodeQoi :: BS.ByteString -> Maybe (Header, SomePixels)
 decodeQoi str
   | consumed /= 14 = Nothing
-  | otherwise = Just (header, decodePixels (BS.drop consumed str) (fromIntegral $ hWidth header * hHeight header))
+  | hChannels header == 3 = Just (header, Pixels3 decode')
+  | hChannels header == 4 = Just (header, Pixels4 decode')
+  | otherwise = Nothing
   where
     (consumed, header) = second fixupBE $ decodeExPortionWith peek str
     fixupBE Header { .. } = Header { hMagic = fromBigEndian hMagic
@@ -116,3 +126,5 @@ decodeQoi str
                                    , hHeight = fromBigEndian hHeight
                                    , ..
                                    }
+    decode' :: Pixel pixel => V.Vector pixel
+    decode' = decodePixels (BS.drop consumed str) (fromIntegral $ hWidth header * hHeight header)
