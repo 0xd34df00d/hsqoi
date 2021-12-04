@@ -31,6 +31,7 @@ data ChunkResult pixel
   = One pixel
   | Repeat pixel Int
   | Lookback Int
+  | Stop
 
 peekChunk :: Pixel pixel => BS.ByteString -> Int -> pixel -> (Int, ChunkResult pixel)
 peekChunk str pos prevPixel
@@ -72,7 +73,7 @@ peekChunk str pos prevPixel
                                 a' = (negate ha .&. (str ! pos + 1 + fromIntegral (hr + hg + hb)))
                                  .|. (ha - 1)    .&. a
                              in (1 + fromIntegral (hr + hg + hb + ha), One $ fromRGBA r' g' b' a')
-  | otherwise = error "unknown byte"
+  | otherwise = (0, Stop)
   where
     byte = str ! pos
 
@@ -98,6 +99,7 @@ decodePixels str n = V.create $ do
                  Repeat px cnt -> do VM.set (VM.unsafeSlice outPos cnt mvec) px
                                      updateRunning px
                                      step (inPos + diff) (outPos + cnt) px
+                 Stop          -> pure ()
         | otherwise = pure ()
   step 0 0 initPixel
 
