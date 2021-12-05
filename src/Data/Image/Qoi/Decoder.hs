@@ -14,12 +14,11 @@ module Data.Image.Qoi.Decoder
 import qualified Data.Array.Base as A
 import qualified Data.Array.ST as A
 import qualified Data.ByteString as BS
-import Control.Arrow
+import qualified Data.ByteString.Lazy as BSL
 import Control.Monad
+import Data.Binary
+import Data.Binary.Get
 import Data.Bits
-import Data.Store
-import Data.Word
-import System.ByteOrder
 
 import Data.Image.Qoi.Format
 import Data.Image.Qoi.Pixel
@@ -104,18 +103,17 @@ data SomePixels where
   Pixels3 :: A.UArray Int Pixel3 -> SomePixels
   Pixels4 :: A.UArray Int Pixel4 -> SomePixels
 
-decodeQoi :: BS.ByteString -> Maybe (Header, SomePixels)
-decodeQoi str
-  | consumed /= 14 = Nothing
+decodeWHeader :: BS.ByteString
+              -> Either (BSL.ByteString, ByteOffset, String) (BSL.ByteString, ByteOffset, Header)
+              -> Maybe (Header, SomePixels)
+decodeWHeader _ (Left _) = Nothing
+decodeWHeader str (Right (_, consumed, header))
   | hChannels header == 3 = Just (header, Pixels3 decode')
   | hChannels header == 4 = Just (header, Pixels4 decode')
   | otherwise = Nothing
   where
-    (consumed, header) = second fixupBE $ decodeExPortionWith peek str
-    fixupBE Header { .. } = Header { hMagic = fromBigEndian hMagic
-                                   , hWidth = fromBigEndian hWidth
-                                   , hHeight = fromBigEndian hHeight
-                                   , ..
-                                   }
     decode' :: Pixel pixel => A.UArray Int pixel
-    decode' = decodePixels str consumed (fromIntegral $ hWidth header * hHeight header)
+    decode' = decodePixels str (fromIntegral consumed) (fromIntegral $ hWidth header * hHeight header)
+
+decodeQoi :: BS.ByteString -> Maybe (Header, SomePixels)
+decodeQoi str = decodeWHeader str $ decodeOrFail $ BSL.fromStrict $ BS.take 14 str
