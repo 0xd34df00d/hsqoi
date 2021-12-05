@@ -30,14 +30,14 @@ main = getArgs >>=
   \case ["decode", inFile] -> do
            bs <- unsafeMMapFile inFile
            case decodeQoi bs of
-                Just (header, pixels) -> do print header
-                                            case pixels of
-                                                 Pixels3 pixels' -> print $ A.bounds pixels'
-                                                 Pixels4 pixels' -> print $ A.bounds pixels'
-                Nothing -> putStrLn "Unable to decode"
+                Right (header, pixels) -> do print header
+                                             case pixels of
+                                                  Pixels3 pixels' -> print $ A.bounds pixels'
+                                                  Pixels4 pixels' -> print $ A.bounds pixels'
+                Left err -> putStrLn $ "Unable to decode: " <> show err
         ["decode", inFile, outFile] -> do
            bs <- unsafeMMapFile inFile
            case decodeQoi bs of
-                Nothing -> putStrLn "Unable to decode"
-                Just (header, pixels) -> void $ writeDynamicPng outFile $ toImage header pixels
+                Left err -> putStrLn $ "Unable to decode: " <> show err
+                Right (header, pixels) -> void $ writeDynamicPng outFile $ toImage header pixels
         _ -> putStrLn "Wrong usage"

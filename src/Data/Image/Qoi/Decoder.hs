@@ -8,6 +8,7 @@
 
 module Data.Image.Qoi.Decoder
 ( decodeQoi
+, DecodeError(..)
 , SomePixels(..)
 ) where
 
@@ -103,17 +104,24 @@ data SomePixels where
   Pixels3 :: A.UArray Int Pixel3 -> SomePixels
   Pixels4 :: A.UArray Int Pixel4 -> SomePixels
 
+data DecodeError
+  = HeaderError String
+  | UnsupportedChannels Int
+  | UnpaddedFile
+  deriving (Show)
+
 decodeWHeader :: BS.ByteString
               -> Either (BSL.ByteString, ByteOffset, String) (BSL.ByteString, ByteOffset, Header)
-              -> Maybe (Header, SomePixels)
-decodeWHeader _ (Left _) = Nothing
+              -> Either DecodeError (Header, SomePixels)
+decodeWHeader _ (Left (_, _, err)) = Left $ HeaderError err
 decodeWHeader str (Right (_, consumed, header))
-  | hChannels header == 3 = Just (header, Pixels3 decode')
-  | hChannels header == 4 = Just (header, Pixels4 decode')
-  | otherwise = Nothing
+  | any (\i -> (str ! BS.length str - i) /= 0) [1..4] = Left UnpaddedFile
+  | hChannels header == 3 = Right (header, Pixels3 decode')
+  | hChannels header == 4 = Right (header, Pixels4 decode')
+  | otherwise = Left $ UnsupportedChannels $ fromIntegral $ hChannels header
   where
     decode' :: Pixel pixel => A.UArray Int pixel
     decode' = decodePixels str (fromIntegral consumed) (fromIntegral $ hWidth header * hHeight header)
 
-decodeQoi :: BS.ByteString -> Maybe (Header, SomePixels)
+decodeQoi :: BS.ByteString -> Either DecodeError (Header, SomePixels)
 decodeQoi str = decodeWHeader str $ decodeOrFail $ BSL.fromStrict $ BS.take 14 str
