@@ -29,6 +29,9 @@ dependencies:
 - vector
 - vector-th-unbox
 
+ghc-options:
+- -Wall
+
 library:
   source-dirs: src
 
