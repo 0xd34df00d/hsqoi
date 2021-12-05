@@ -94,9 +94,11 @@ decodePixels str strFrom n = A.runSTUArray $ do
                  Repeat px cnt -> do forM_ [0..cnt - 1] $ \i -> A.unsafeWrite mvec (outPos + i) px
                                      updateRunning running px
                                      step (inPos + diff) (outPos + cnt) px
-                 Stop          -> pure ()
-        | otherwise = pure ()
-  step strFrom 0 initPixel
+                 Stop          -> pure outPos
+        | otherwise = pure outPos
+  finish <- step strFrom 0 initPixel
+
+  forM_ [finish .. n - 1] $ \i -> A.unsafeWrite mvec i initPixel
 
   pure mvec
 
