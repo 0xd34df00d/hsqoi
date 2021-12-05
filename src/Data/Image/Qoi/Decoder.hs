@@ -12,11 +12,8 @@ module Data.Image.Qoi.Decoder
 ) where
 
 import qualified Data.Array.Base as A
-import qualified Data.Array.MArray as A
 import qualified Data.Array.ST as A
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Internal as BSI
-import qualified Data.ByteString.Unsafe as BSU
 import Control.Arrow
 import Control.Monad
 import Data.Bits
@@ -26,15 +23,7 @@ import System.ByteOrder
 
 import Data.Image.Qoi.Format
 import Data.Image.Qoi.Pixel
-
-infix 4 !
-(!) :: BS.ByteString -> Int -> Word8
-(!) = BS.unsafeIndex
-
-infix 8 .>>., .<<.
-(.>>.), (.<<.) :: Bits a => a -> Int -> a
-(.>>.) = shiftR
-(.<<.) = shiftL
+import Data.Image.Qoi.Util
 
 data ChunkResult pixel
   = One pixel
@@ -74,13 +63,13 @@ peekChunk str pos prevPixel
                                 ha = byte        .&. 0b1
                                 (r, g, b, a) = toRGBA prevPixel
                                 r' = (negate hr .&. (str ! pos + 1))
-                                 .|. (hr - 1)    .&. r
+                                 .|. (hr - 1)   .&. r
                                 g' = (negate hg .&. (str ! pos + 1 + fromIntegral hr))
-                                 .|. (hg - 1)    .&. g
+                                 .|. (hg - 1)   .&. g
                                 b' = (negate hb .&. (str ! pos + 1 + fromIntegral (hr + hg)))
-                                 .|. (hb - 1)    .&. b
+                                 .|. (hb - 1)   .&. b
                                 a' = (negate ha .&. (str ! pos + 1 + fromIntegral (hr + hg + hb)))
-                                 .|. (ha - 1)    .&. a
+                                 .|. (ha - 1)   .&. a
                              in (1 + fromIntegral (hr + hg + hb + ha), One $ fromRGBA r' g' b' a')
   | otherwise = (0, Stop)
   where
@@ -92,21 +81,18 @@ decodePixels str strFrom n = A.runSTUArray $ do
 
   running <- A.newArray @(A.STUArray s) (0, 63 :: Int) initPixel
 
-  let updateRunning px = let (r, g, b, a) = toRGBA px
-                          in A.unsafeWrite running (fromIntegral $ (r `xor` g `xor` b `xor` a) .&. 0b00111111) px
-
   let step inPos outPos prevPixel
         | outPos < n = do
             let (diff, chunk) = peekChunk str inPos prevPixel
             case chunk of
                  One px        -> do A.unsafeWrite mvec outPos px
-                                     updateRunning px
+                                     updateRunning running px
                                      step (inPos + diff) (outPos + 1)   px
                  Lookback pos  -> do px <- A.unsafeRead running pos
                                      A.unsafeWrite mvec outPos px
                                      step (inPos + diff) (outPos + 1)   px
                  Repeat px cnt -> do forM_ [0..cnt - 1] $ \i -> A.unsafeWrite mvec (outPos + i) px
-                                     updateRunning px
+                                     updateRunning running px
                                      step (inPos + diff) (outPos + cnt) px
                  Stop          -> pure ()
         | otherwise = pure ()
