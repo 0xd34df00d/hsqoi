@@ -3,5 +3,8 @@ dist*
 *~
 *.cabal
 
+# Profiling reports
+*.prof
+
 # Nix artifacts
 result*
