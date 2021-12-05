@@ -2,6 +2,8 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE BinaryLiterals #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -O2 -fllvm #-}
 
 module Data.Image.Qoi.Decoder
@@ -9,11 +11,14 @@ module Data.Image.Qoi.Decoder
 , SomePixels(..)
 ) where
 
+import qualified Data.Array.Base as A
+import qualified Data.Array.MArray as A
+import qualified Data.Array.ST as A
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Unsafe as BS
-import qualified Data.Vector.Unboxed as V
-import qualified Data.Vector.Unboxed.Mutable as VM
+import qualified Data.ByteString.Internal as BSI
+import qualified Data.ByteString.Unsafe as BSU
 import Control.Arrow
+import Control.Monad
 import Data.Bits
 import Data.Store
 import Data.Word
@@ -81,37 +86,37 @@ peekChunk str pos prevPixel
   where
     byte = str ! pos
 
-decodePixels :: Pixel pixel => BS.ByteString -> Int -> V.Vector pixel
-decodePixels str n = V.create $ do
-  mvec <- VM.new n
+decodePixels :: Pixel pixel => BS.ByteString -> Int -> Int -> A.UArray Int pixel
+decodePixels str strFrom n = A.runSTUArray $ do
+  (mvec :: A.STUArray s Int pixel) <- A.unsafeNewArray_ (0, n - 1)
 
-  running <- VM.replicate 64 $ initPixel
+  running <- A.newArray @(A.STUArray s) (0, 63 :: Int) initPixel
 
   let updateRunning px = let (r, g, b, a) = toRGBA px
-                          in VM.unsafeWrite running (fromIntegral $ (r `xor` g `xor` b `xor` a) .&. 0b00111111) px
+                          in A.unsafeWrite running (fromIntegral $ (r `xor` g `xor` b `xor` a) .&. 0b00111111) px
 
   let step inPos outPos prevPixel
         | outPos < n = do
             let (diff, chunk) = peekChunk str inPos prevPixel
             case chunk of
-                 One px        -> do VM.unsafeWrite mvec outPos px
+                 One px        -> do A.unsafeWrite mvec outPos px
                                      updateRunning px
                                      step (inPos + diff) (outPos + 1)   px
-                 Lookback pos  -> do px <- VM.unsafeRead running pos
-                                     VM.unsafeWrite mvec outPos px
+                 Lookback pos  -> do px <- A.unsafeRead running pos
+                                     A.unsafeWrite mvec outPos px
                                      step (inPos + diff) (outPos + 1)   px
-                 Repeat px cnt -> do VM.set (VM.unsafeSlice outPos cnt mvec) px
+                 Repeat px cnt -> do forM_ [0..cnt - 1] $ \i -> A.unsafeWrite mvec (outPos + i) px
                                      updateRunning px
                                      step (inPos + diff) (outPos + cnt) px
                  Stop          -> pure ()
         | otherwise = pure ()
-  step 0 0 initPixel
+  step strFrom 0 initPixel
 
   pure mvec
 
 data SomePixels where
-  Pixels3 :: V.Vector Pixel3 -> SomePixels
-  Pixels4 :: V.Vector Pixel4 -> SomePixels
+  Pixels3 :: A.UArray Int Pixel3 -> SomePixels
+  Pixels4 :: A.UArray Int Pixel4 -> SomePixels
 
 decodeQoi :: BS.ByteString -> Maybe (Header, SomePixels)
 decodeQoi str
@@ -126,5 +131,5 @@ decodeQoi str
                                    , hHeight = fromBigEndian hHeight
                                    , ..
                                    }
-    decode' :: Pixel pixel => V.Vector pixel
-    decode' = decodePixels (BS.drop consumed str) (fromIntegral $ hWidth header * hHeight header)
+    decode' :: Pixel pixel => A.UArray Int pixel
+    decode' = decodePixels str consumed (fromIntegral $ hWidth header * hHeight header)

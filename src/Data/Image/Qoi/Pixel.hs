@@ -1,71 +1,106 @@
 {-# LANGUAGE Strict #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE QuantifiedConstraints #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -O2 -fllvm #-}
 
 module Data.Image.Qoi.Pixel where
 
-import qualified Data.Vector.Unboxed as V
-import qualified Data.Vector.Unboxed.Mutable as VM
-import qualified Data.Vector.Generic.Base as VG
-import qualified Data.Vector.Generic.Mutable.Base as VMG
+import qualified Data.Array.Base as A
+import qualified Data.Array.MArray as A
+import qualified Data.Array.ST as A
+import Control.Monad.ST
 import Data.Vector.Unboxed.Deriving
 import Data.Bits
 import Data.Word
+import GHC.Base
+import GHC.ST
+import GHC.Word
 
 data Pixel3 = Pixel3 Word8 Word8 Word8 deriving (Show)
 data Pixel4 = Pixel4 Word8 Word8 Word8 Word8 deriving (Show)
 
-newtype instance VM.MVector s Pixel3 = MV_Pixel3 { getMVP3 :: VM.MVector s Word8 }
-newtype instance V.Vector     Pixel3 = V_Pixel3  { getVP3  :: V.Vector Word8 }
+instance A.MArray (A.STUArray s) Pixel3 (ST s) where
+  getBounds (A.STUArray l u _ _) = pure (l, u)
+  {-# INLINE getBounds #-}
+  getNumElements (A.STUArray _ _ n _) = pure n
+  {-# INLINE getNumElements #-}
 
-instance VG.Vector V.Vector Pixel3 where
-  basicUnsafeFreeze = fmap V_Pixel3 . VG.basicUnsafeFreeze . getMVP3
-  basicUnsafeThaw = fmap MV_Pixel3 . VG.basicUnsafeThaw . getVP3
-  basicLength = (`div` 3) . VG.basicLength . getVP3
-  basicUnsafeSlice s l = V_Pixel3 . VG.basicUnsafeSlice (s * 3) (l * 3) . getVP3
-  basicUnsafeIndexM (V_Pixel3 vec) idx = Pixel3 <$> VG.basicUnsafeIndexM vec idx'
-                                                <*> VG.basicUnsafeIndexM vec (idx' + 1)
-                                                <*> VG.basicUnsafeIndexM vec (idx' + 2)
+  newArray_ arrBounds = A.newArray arrBounds (Pixel3 0 0 0)
+  {-# INLINE newArray_ #-}
+  unsafeNewArray_ (l, u) = A.unsafeNewArraySTUArray_ (l, u) (*# 3#)
+  {-# INLINE unsafeNewArray_ #-}
+
+  unsafeRead (A.STUArray _ _ _ marr#) (I# n#) = ST $ \s1# ->
+    let n'# = n# *# 3#
+        (# s2#, r# #) = readWord8Array# marr# n'#         s1#
+        (# s3#, g# #) = readWord8Array# marr# (n'# +# 1#) s2#
+        (# s4#, b# #) = readWord8Array# marr# (n'# +# 2#) s3#
+     in (# s4#, Pixel3 (W8# r#) (W8# g#) (W8# b#) #)
+  {-# INLINE unsafeRead #-}
+  unsafeWrite (A.STUArray _ _ _ marr#) (I# n#) (Pixel3 (W8# r#) (W8# g#) (W8# b#)) = ST $ \s1# ->
+    let n'# = n# *# 3#
+        s2# = writeWord8Array# marr# n'#         r# s1#
+        s3# = writeWord8Array# marr# (n'# +# 1#) g# s2#
+        s4# = writeWord8Array# marr# (n'# +# 2#) b# s3#
+     in (# s4#, () #)
+  {-# INLINE unsafeWrite #-}
+
+instance A.IArray A.UArray Pixel3 where
+  bounds (A.UArray l u _ _) = (l, u)
+  numElements (A.UArray  _ _ n _) = n
+  unsafeArray lu ies = runST (A.unsafeArrayUArray lu ies $ Pixel3 0 0 0)
+  unsafeAt (A.UArray _ _ _ arr#) (I# n#) = Pixel3 (W8# (indexWord8Array# arr# n'#))
+                                                  (W8# (indexWord8Array# arr# (n'# +# 1#)))
+                                                  (W8# (indexWord8Array# arr# (n'# +# 2#)))
     where
-      idx' = idx * 3
-  elemseq _ !px b = b
+      n'# = n# *# 3#
 
-instance VMG.MVector VM.MVector Pixel3 where
-  basicLength = (`div` 3) . VMG.basicLength . getMVP3
-  basicUnsafeSlice s l = MV_Pixel3 . VMG.basicUnsafeSlice (s * 3) (l * 3) . getMVP3
-  basicOverlaps (MV_Pixel3 v1) (MV_Pixel3 v2) = VMG.basicOverlaps v1 v2
-  basicUnsafeNew = fmap MV_Pixel3 . VMG.basicUnsafeNew . (* 3)
-  basicInitialize = VMG.basicInitialize . getMVP3
-  basicUnsafeRead (MV_Pixel3 vec) idx = Pixel3 <$> VMG.basicUnsafeRead vec idx'
-                                               <*> VMG.basicUnsafeRead vec (idx' + 1)
-                                               <*> VMG.basicUnsafeRead vec (idx' + 2)
+instance A.MArray (A.STUArray s) Pixel4 (ST s) where
+  getBounds (A.STUArray l u _ _) = pure (l, u)
+  {-# INLINE getBounds #-}
+  getNumElements (A.STUArray _ _ n _) = pure n
+  {-# INLINE getNumElements #-}
+
+  newArray_ arrBounds = A.newArray arrBounds (Pixel4 0 0 0 0)
+  {-# INLINE newArray_ #-}
+  unsafeNewArray_ (l, u) = A.unsafeNewArraySTUArray_ (l, u) (*# 4#)
+  {-# INLINE unsafeNewArray_ #-}
+
+  unsafeRead (A.STUArray _ _ _ marr#) (I# n#) = ST $ \s1# ->
+    let n'# = n# *# 4#
+        (# s2#, r# #) = readWord8Array# marr# n'#         s1#
+        (# s3#, g# #) = readWord8Array# marr# (n'# +# 1#) s2#
+        (# s4#, b# #) = readWord8Array# marr# (n'# +# 2#) s3#
+        (# s5#, a# #) = readWord8Array# marr# (n'# +# 3#) s4#
+     in (# s5#, Pixel4 (W8# r#) (W8# g#) (W8# b#) (W8# a#) #)
+  {-# INLINE unsafeRead #-}
+  unsafeWrite (A.STUArray _ _ _ marr#) (I# n#) (Pixel4 (W8# r#) (W8# g#) (W8# b#) (W8# a#)) = ST $ \s1# ->
+    let n'# = n# *# 4#
+        s2# = writeWord8Array# marr# n'#         r# s1#
+        s3# = writeWord8Array# marr# (n'# +# 1#) g# s2#
+        s4# = writeWord8Array# marr# (n'# +# 2#) b# s3#
+        s5# = writeWord8Array# marr# (n'# +# 3#) b# s4#
+     in (# s5#, () #)
+  {-# INLINE unsafeWrite #-}
+
+instance A.IArray A.UArray Pixel4 where
+  bounds (A.UArray l u _ _) = (l, u)
+  numElements (A.UArray  _ _ n _) = n
+  unsafeArray lu ies = runST (A.unsafeArrayUArray lu ies $ Pixel4 0 0 0 0)
+  unsafeAt (A.UArray _ _ _ arr#) (I# n#) = Pixel4 (W8# (indexWord8Array# arr# n'#))
+                                                  (W8# (indexWord8Array# arr# (n'# +# 1#)))
+                                                  (W8# (indexWord8Array# arr# (n'# +# 2#)))
+                                                  (W8# (indexWord8Array# arr# (n'# +# 3#)))
     where
-      idx' = idx * 3
-  basicUnsafeWrite (MV_Pixel3 vec) idx (Pixel3 r g b) = VMG.basicUnsafeWrite vec idx' r
-                                                     >> VMG.basicUnsafeWrite vec (idx' + 1) g
-                                                     >> VMG.basicUnsafeWrite vec (idx' + 2) b
-    where
-      idx' = idx * 3
+      n'# = n# *# 4#
 
-instance VM.Unbox Pixel3
-
-derivingUnbox "Pixel4"
-  [t| Pixel4 -> Word32 |]
-  [| \(Pixel4 r g b a) -> (fromIntegral r `shiftL` 24)
-                      .|. (fromIntegral g `shiftL` 16)
-                      .|. (fromIntegral b `shiftL` 8)
-                      .|.  fromIntegral a
-                      |]
-  [| \w32 -> Pixel4 (fromIntegral $ w32 `shiftR` 24)
-                    (fromIntegral $ w32 `shiftR` 16)
-                    (fromIntegral $ w32 `shiftR` 8)
-                    (fromIntegral   w32)
-                    |]
-
-class VM.Unbox a => Pixel a where
+class (forall s. A.MArray (A.STUArray s) a (ST s)) => Pixel a where
   initPixel :: a
 
   addRGB  :: a -> Word8 -> Word8 -> Word8 -> a

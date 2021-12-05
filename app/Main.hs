@@ -4,8 +4,7 @@
 
 module Main where
 
-import qualified Data.Vector.Storable as S
-import qualified Data.Vector.Unboxed as V
+import qualified Data.Array.IArray as A
 import Codec.Picture.Png
 import Codec.Picture.Types
 import Data.Functor
@@ -19,11 +18,11 @@ import Data.Image.Qoi.Pixel
 toImage :: Header -> SomePixels -> DynamicImage
 toImage Header { .. } (Pixels3 pixels) = ImageRGB8 $ generateImage f (fromIntegral hWidth) (fromIntegral hHeight)
   where
-    f x y = let Pixel3 r g b = pixels V.! (y * fromIntegral hWidth + x)
+    f x y = let Pixel3 r g b = pixels A.! (y * fromIntegral hWidth + x)
              in PixelRGB8 r g b
 toImage Header { .. } (Pixels4 pixels) = ImageRGBA8 $ generateImage f (fromIntegral hWidth) (fromIntegral hHeight)
   where
-    f x y = let Pixel4 r g b a = pixels V.! (y * fromIntegral hWidth + x)
+    f x y = let Pixel4 r g b a = pixels A.! (y * fromIntegral hWidth + x)
              in PixelRGBA8 r g b a
 
 main :: IO ()
@@ -33,8 +32,8 @@ main = getArgs >>=
            case decodeQoi bs of
                 Just (header, pixels) -> do print header
                                             case pixels of
-                                                 Pixels3 pixels' -> print $ V.length pixels'
-                                                 Pixels4 pixels' -> print $ V.length pixels'
+                                                 Pixels3 pixels' -> print $ A.bounds pixels'
+                                                 Pixels4 pixels' -> print $ A.bounds pixels'
                 Nothing -> putStrLn "Unable to decode"
         ["decode", inFile, outFile] -> do
            bs <- unsafeMMapFile inFile
