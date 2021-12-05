@@ -26,11 +26,10 @@ let
   filterSource = pkgs.nix-gitignore.gitignoreRecursiveSource [ ./.gitignore ];
 
   hsPkgs = haskellPackages.extend (self: super: {
-    hsqoi = haskell.lib.overrideCabal
-      (self.callCabal2nix "hsqoi" (filterSource ./.) {})
-      (_: {
-        librarySystemDepends = [ llvm ];
-      });
+    hsqoi =
+      haskell.lib.overrideCabal
+        (self.callCabal2nix "hsqoi" (filterSource ./.) {})
+        (_: { librarySystemDepends = [ llvm ]; });
 
     store = haskell.lib.overrideCabal super.store (_: {
       version = "0.7.14";
