@@ -49,7 +49,7 @@ in
     buildInputs = [
       hsPkgs.cabal-install
       hsPkgs.hpack # To compile package.yaml to *.cabal
-      pkgs.llvm_12
+      llvm
     ];
   };
 }
