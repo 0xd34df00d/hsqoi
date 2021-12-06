@@ -34,3 +34,8 @@ infix 4 !
 (!) :: BS.ByteString -> Int -> Word8
 (BSI.PS x _ _) ! i = BSI.accursedUnutterablePerformIO $ withForeignPtr x $ \p -> peekByteOff p i
 {-# INLINE (!) #-}
+
+unsafeShrink :: A.STUArray s Int Word8 -> Int -> A.STUArray s Int Word8
+unsafeShrink arr@(A.STUArray l _ n marr) cnt
+  | cnt >= n = arr
+  | otherwise = A.STUArray l (l + cnt - 1) cnt marr
