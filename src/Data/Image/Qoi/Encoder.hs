@@ -103,13 +103,12 @@ maxRunLen = 8224
 
 encodeRun :: Int -> A.STUArray s Int Word8 -> Int -> ST s Int
 encodeRun runLen out outPos
-  | runLen == 0 = pure 0
-  | runLen <= 32 = A.unsafeWrite out outPos (0b01000000 .|. fromIntegral (runLen - 1)) $> 1
-  | runLen <= 8224 = do let runLen' = runLen - 33
-                        A.unsafeWrite out outPos       (0b01100000 .|. fromIntegral (runLen' .>>. 8))
-                        A.unsafeWrite out (outPos + 1) (fromIntegral runLen')
-                        pure 2
-  | otherwise = pure 0
+  | runLen == 0 = pure outPos
+  | runLen <= 32 = A.unsafeWrite out outPos (0b01000000 .|. fromIntegral (runLen - 1)) $> outPos + 1
+  | otherwise = do let runLen' = runLen - 33
+                   A.unsafeWrite out outPos       (0b01100000 .|. fromIntegral (runLen' .>>. 8))
+                   A.unsafeWrite out (outPos + 1) (fromIntegral runLen')
+                   pure $ outPos + 2
 {-# INLINE encodeRun #-}
 
 maxResultSize :: Header -> (Int, BS.ByteString)
@@ -120,12 +119,8 @@ maxResultSize h@Header { .. } = (maxLen, headerBS)
            + fromIntegral (hChannels + 1) * fromIntegral (hWidth * hHeight)
            + 4 -- end padding
 
-encodeRaw :: Header -> BS.ByteString -> Int -> A.UArray Int Word8
-encodeRaw header inBytes startPos = A.runSTUArray $ do
-  (result :: A.STUArray s Int Word8) <- A.unsafeNewArray_ (0, maxLen - 1)
-
-  forM_ [0 .. headerLen - 1] $ \i -> A.unsafeWrite result i (headerBS ! i)
-
+encodeIntoArray :: forall s. Int -> BS.ByteString -> Int -> A.STUArray s Int Word8 -> ST s Int
+encodeIntoArray headerLen inBytes startPos result = do
   running <- A.newArray @(A.STUArray s) (0, 63 :: Int) initPixel
 
   let step inPos outPos px@(Pixel3 r1 g1 b1) prevPx@(Pixel3 r0 g0 b0) = do
@@ -150,16 +145,25 @@ encodeRaw header inBytes startPos = A.runSTUArray $ do
               | otherwise = (pos + 3, runLen, px)
 
         let (afterRun, runLen, nextPix) = tryRun (inPos + 3) 0
-        runDiff <- encodeRun runLen result (outPos + pxDiff)
+        outPos' <- encodeRun runLen result (outPos + pxDiff)
 
         if afterRun <= inLen
-           then step afterRun (outPos + pxDiff + runDiff) nextPix px
-           else pure outPos
-  final <- step startPos headerLen (readPixel3 inBytes startPos) initPixel
-  forM_ [0..3] $ \i -> A.unsafeWrite result (final + i) 0
-
-  pure $ unsafeShrink result (final + 4)
+           then step afterRun outPos' nextPix px
+           else pure outPos'
+  step startPos headerLen (readPixel3 inBytes startPos) initPixel
   where
     inLen = BS.length inBytes
+{-# INLINE encodeIntoArray #-}
+
+encodeRaw :: Header -> BS.ByteString -> Int -> A.UArray Int Word8
+encodeRaw header inBytes startPos = A.runSTUArray $ do
+  result <- A.unsafeNewArray_ (0, maxLen - 1)
+  forM_ [0 .. headerLen - 1] $ \i -> A.unsafeWrite result i (headerBS ! i)
+  final <- if startPos < BS.length inBytes
+              then encodeIntoArray headerLen inBytes startPos result
+              else pure headerLen
+  forM_ [0..3] $ \i -> A.unsafeWrite result (final + i) 0
+  pure $ unsafeShrink result (final + 4)
+  where
     (maxLen, headerBS) = maxResultSize header
     headerLen = BS.length headerBS
