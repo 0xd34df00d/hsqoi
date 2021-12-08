@@ -54,3 +54,5 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - hsqoi
+    - hspec
+    - QuickCheck

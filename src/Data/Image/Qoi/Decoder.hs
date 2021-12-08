@@ -105,6 +105,7 @@ decodePixels str strFrom n = A.runSTUArray $ do
 data SomePixels where
   Pixels3 :: A.UArray Int Pixel3 -> SomePixels
   Pixels4 :: A.UArray Int Pixel4 -> SomePixels
+  deriving (Show)
 
 data DecodeError
   = HeaderError String
