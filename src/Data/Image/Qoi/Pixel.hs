@@ -105,7 +105,7 @@ instance A.IArray A.UArray Pixel4 where
       n'# = n# *# 4#
   {-# INLINE unsafeAt #-}
 
-class (forall s. A.MArray (A.STUArray s) a (ST s)) => Pixel a where
+class (Eq a, forall s. A.MArray (A.STUArray s) a (ST s)) => Pixel a where
   initPixel :: a
 
   addRGB  :: a -> Word8 -> Word8 -> Word8 -> a
