@@ -22,6 +22,8 @@ import GHC.Base
 import GHC.ST
 import GHC.Word
 
+import Data.Image.Qoi.Util
+
 data Pixel3 = Pixel3 Word8 Word8 Word8 deriving (Show, Eq)
 data Pixel4 = Pixel4 Word8 Word8 Word8 Word8 deriving (Show, Eq)
 
@@ -115,6 +117,8 @@ class (Eq a, forall s. A.MArray (A.STUArray s) a (ST s)) => Pixel a where
   toRGBA :: a -> (Word8, Word8, Word8, Word8)
   fromRGBA :: Word8 -> Word8 -> Word8 -> Word8 -> a
 
+  readPixel :: BS.ByteString -> Int -> a
+
 instance Pixel Pixel3 where
   addRGB (Pixel3 r g b) dr dg db = Pixel3 (r + dr) (g + dg) (b + db)
   {-# INLINE addRGB #-}
@@ -125,6 +129,9 @@ instance Pixel Pixel3 where
   fromRGBA r g b _ = Pixel3 r g b
   {-# INLINE fromRGBA #-}
 
+  readPixel str pos = Pixel3 (str ! pos) (str ! pos + 1) (str ! pos + 2)
+  {-# INLINE readPixel #-}
+
 instance Pixel Pixel4 where
   addRGB (Pixel4 r g b a) dr dg db = Pixel4 (r + dr) (g + dg) (b + db) a
   {-# INLINE addRGB #-}
@@ -134,3 +141,15 @@ instance Pixel Pixel4 where
   {-# INLINE toRGBA #-}
   fromRGBA r g b a = Pixel4 r g b a
   {-# INLINE fromRGBA #-}
+
+  readPixel str pos = Pixel4 (str ! pos) (str ! pos + 1) (str ! pos + 2) (str ! pos + 3)
+  {-# INLINE readPixel #-}
+
+pixelHash :: (Num a, Pixel pixel) => pixel -> a
+pixelHash px = fromIntegral $ (r `xor` g `xor` b `xor` a) .&. 0b00111111
+  where (r, g, b, a) = toRGBA px
+{-# INLINE pixelHash #-}
+
+updateRunning :: Pixel pixel => A.STUArray s Int pixel -> pixel -> ST s ()
+updateRunning running px = A.unsafeWrite running (pixelHash px) px
+{-# INLINE updateRunning #-}
