@@ -126,16 +126,16 @@ encodeIntoArray :: forall pixel s. Pixel pixel
                 -> Int
                 -> A.STUArray s Int Word8
                 -> ST s Int
-encodeIntoArray _ headerLen inBytes startPos result = do
+encodeIntoArray proxy headerLen inBytes startPos result = do
   running <- A.newArray @(A.STUArray s) (0, 63 :: Int) (fromRGBA @pixel 0 0 0 255)
 
   let step inPos runLen prevPx outPos
-        | inPos + 3 <= inLen
+        | inPos + diff <= inLen
         , readPixel inBytes inPos == prevPx =
           if runLen /= maxRunLen - 1
-             then step (inPos + 3) (runLen + 1) prevPx outPos
-             else encodeRun maxRunLen result outPos >>= step (inPos + 3) 0 prevPx
-        | inPos + 3 <= inLen = do
+             then step (inPos + diff) (runLen + 1) prevPx outPos
+             else encodeRun maxRunLen result outPos >>= step (inPos + diff) 0 prevPx
+        | inPos + diff <= inLen = do
           let (r0, g0, b0, a0) = toRGBA prevPx
           let px = readPixel inBytes inPos
           let (r1, g1, b1, a1) = toRGBA px
@@ -153,13 +153,14 @@ encodeIntoArray _ headerLen inBytes startPos result = do
 
           A.unsafeWrite running hash px
 
-          step (inPos + 3) 0 px (outPos' + pxDiff)
+          step (inPos + diff) 0 px (outPos' + pxDiff)
         | runLen /= 0 = encodeRun runLen result outPos
         | otherwise = pure outPos
 
   step startPos 0 (fromRGBA 0 0 0 255) headerLen
   where
     inLen = BS.length inBytes
+    diff = channelCount proxy
 {-# INLINE encodeIntoArray #-}
 
 encodeRaw :: Header -> BS.ByteString -> Int -> A.UArray Int Word8

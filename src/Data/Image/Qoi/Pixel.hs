@@ -118,6 +118,7 @@ class (Eq a, forall s. A.MArray (A.STUArray s) a (ST s)) => Pixel a where
   fromRGBA :: Word8 -> Word8 -> Word8 -> Word8 -> a
 
   readPixel :: BS.ByteString -> Int -> a
+  channelCount :: proxy a -> Int
 
 instance Pixel Pixel3 where
   addRGB (Pixel3 r g b) dr dg db = Pixel3 (r + dr) (g + dg) (b + db)
@@ -131,6 +132,8 @@ instance Pixel Pixel3 where
 
   readPixel str pos = Pixel3 (str ! pos) (str ! pos + 1) (str ! pos + 2)
   {-# INLINE readPixel #-}
+  channelCount _ = 3
+  {-# INLINE channelCount #-}
 
 instance Pixel Pixel4 where
   addRGB (Pixel4 r g b a) dr dg db = Pixel4 (r + dr) (g + dg) (b + db) a
@@ -144,6 +147,8 @@ instance Pixel Pixel4 where
 
   readPixel str pos = Pixel4 (str ! pos) (str ! pos + 1) (str ! pos + 2) (str ! pos + 3)
   {-# INLINE readPixel #-}
+  channelCount _ = 4
+  {-# INLINE channelCount #-}
 
 pixelHash :: (Num a, Pixel pixel) => pixel -> a
 pixelHash px = fromIntegral $ (r `xor` g `xor` b `xor` a) .&. 0b00111111
