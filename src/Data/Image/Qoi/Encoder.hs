@@ -121,7 +121,7 @@ maxResultSize h@Header { .. } = (maxLen, headerBS)
 
 encodeIntoArray :: forall s. Int -> BS.ByteString -> Int -> A.STUArray s Int Word8 -> ST s Int
 encodeIntoArray headerLen inBytes startPos result = do
-  running <- A.newArray @(A.STUArray s) (0, 63 :: Int) initPixel
+  running <- A.newArray @(A.STUArray s) (0, 63 :: Int) (fromRGBA 0 0 0 255)
 
   let step inPos runLen prevPx@(Pixel3 r0 g0 b0) outPos
         | inPos + 3 <= inLen
@@ -149,7 +149,7 @@ encodeIntoArray headerLen inBytes startPos result = do
         | runLen /= 0 = encodeRun runLen result outPos
         | otherwise = pure outPos
 
-  step startPos 0 initPixel headerLen
+  step startPos 0 (fromRGBA 0 0 0 255) headerLen
   where
     inLen = BS.length inBytes
 {-# INLINE encodeIntoArray #-}

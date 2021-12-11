@@ -79,7 +79,7 @@ decodePixels :: Pixel pixel => BS.ByteString -> Int -> Int -> A.UArray Int pixel
 decodePixels str strFrom n = A.runSTUArray $ do
   (mvec :: A.STUArray s Int pixel) <- A.unsafeNewArray_ (0, n - 1)
 
-  running <- A.newArray @(A.STUArray s) (0, 63 :: Int) initPixel
+  running <- A.newArray @(A.STUArray s) (0, 63 :: Int) (fromRGBA 0 0 0 255)
 
   let step inPos outPos prevPixel
         | outPos < n = do
@@ -96,9 +96,9 @@ decodePixels str strFrom n = A.runSTUArray $ do
                                      step (inPos + diff) (outPos + cnt) px
                  Stop          -> pure outPos
         | otherwise = pure outPos
-  finish <- step strFrom 0 initPixel
+  finish <- step strFrom 0 (fromRGBA 0 0 0 255)
 
-  forM_ [finish .. n - 1] $ \i -> A.unsafeWrite mvec i initPixel
+  forM_ [finish .. n - 1] $ \i -> A.unsafeWrite mvec i (fromRGBA 0 0 0 255)
 
   pure mvec
 
