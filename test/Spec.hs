@@ -68,22 +68,26 @@ toArray3 bs = A.array (0, pxCnt - 1) [ (i, Pixel3 r g b)
   where
     pxCnt = BS.length bs `div` 3
 
+imgProperty :: Image3 -> IO ()
+imgProperty Image3 { .. } = do
+  let header = Header { hMagic = matchBytes
+                      , hWidth = fromIntegral iWidth
+                      , hHeight = fromIntegral iHeight
+                      , hChannels = 3
+                      , hColorspace = 0
+                      }
+  let encoded = encodeRaw header (bytes iBytes) 0
+      decoded = decodeQoi $ BS.pack $ A.elems encoded
+  decoded `shouldSatisfy` isRight
+  case decoded of
+       Left _ -> pure ()
+       Right (header', Pixels3 pixels') -> do
+         header' `shouldBe` header
+         pixels' `shouldBe` toArray3 (bytes iBytes)
+       Right _ -> fail "Expected Pixels3"
+
 main :: IO ()
 main = hspec $ modifyMaxSuccess (const 100000) $
   describe "QOI encoder" $
-    it "decode . encode = id" $ property $ \Image3 { .. } -> do
-      let header = Header { hMagic = matchBytes
-                          , hWidth = fromIntegral iWidth
-                          , hHeight = fromIntegral iHeight
-                          , hChannels = 3
-                          , hColorspace = 0
-                          }
-      let encoded = encodeRaw header (bytes iBytes) 0
-          decoded = decodeQoi $ BS.pack $ A.elems encoded
-      decoded `shouldSatisfy` isRight
-      case decoded of
-           Left _ -> pure ()
-           Right (header', Pixels3 pixels') -> do
-             header' `shouldBe` header
-             pixels' `shouldBe` toArray3 (bytes iBytes)
-           Right _ -> fail "Expected Pixels3"
+    parallel $ forM_ ([1..10] :: [Int]) $ \wrk ->
+      it ("decode . encode = id (worker " <> show wrk <> ")") $ property imgProperty
