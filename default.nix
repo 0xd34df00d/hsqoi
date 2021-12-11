@@ -6,6 +6,10 @@
 #   nix-shell
 #   hpack
 #   cabal run hsqoi-exe -- …args…
+#
+# Profile the build:
+#   nix-build -A hsqoi --arg with-profiling true -o result-hsqoi
+#   result-hsqoi/bin/hsqoi-exe +RTS -p
 
 let
   nixpkgsPinJson = builtins.fromJSON (builtins.readFile nix/nixpkgs-pin.json);
@@ -20,6 +24,7 @@ in
 , haskell ? pkgs.haskell
 , haskellPackages ? haskell.packages.ghc921
 , llvm ? pkgs.llvm_12 # 13 fails to compile, some assembly error
+, with-profiling ? false
 }:
 
 let
@@ -38,10 +43,18 @@ let
       editedCabalFile = null;
     });
   });
+
+  profilingFn =
+    if ! with-profiling
+    then pkgs.lib.id
+    else
+      pkgs.lib.flip
+        haskell.lib.appendConfigureFlag
+        "--enable-library-profiling --enable-executable-profiling";
 in
 
 {
-  inherit (hsPkgs) hsqoi;
+  hsqoi = profilingFn hsPkgs.hsqoi;
 
   shell = hsPkgs.shellFor {
     packages = p: [ p.hsqoi ];
