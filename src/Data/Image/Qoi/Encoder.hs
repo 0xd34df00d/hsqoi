@@ -123,34 +123,33 @@ encodeIntoArray :: forall s. Int -> BS.ByteString -> Int -> A.STUArray s Int Wor
 encodeIntoArray headerLen inBytes startPos result = do
   running <- A.newArray @(A.STUArray s) (0, 63 :: Int) initPixel
 
-  let step inPos outPos px@(Pixel3 r1 g1 b1) prevPx@(Pixel3 r0 g0 b0) = do
-        let (dr, dg, db) = (r1 - r0, g1 - g0, b1 - b0)
+  let step inPos runLen prevPx@(Pixel3 r0 g0 b0) outPos
+        | inPos + 3 <= inLen
+        , readPixel3 inBytes inPos == prevPx =
+          if runLen /= maxRunLen - 1
+             then step (inPos + 3) (runLen + 1) prevPx outPos
+             else encodeRun maxRunLen result outPos >>= step (inPos + 3) 0 prevPx
+        | inPos + 3 <= inLen = do
+          let px@(Pixel3 r1 g1 b1) = readPixel3 inBytes inPos
+          let (dr, dg, db) = (r1 - r0, g1 - g0, b1 - b0)
+          outPos' <- encodeRun runLen result outPos
 
-        let hash = pixelHash px
-        pxDiff <- case encodeDiff8 dr dg db result outPos of
-                       Just act -> act
-                       _ -> do runningPx <- A.unsafeRead running hash
-                               fromJust $ encodeIndex px (fromIntegral hash) runningPx result outPos
-                                      <|> encodeDiff16 dr dg db result outPos
-                                      <|> encodeDiff24 dr dg db 0 result outPos
-                                      <|> encodeColor px prevPx result outPos
+          let hash = pixelHash px
+          pxDiff <- case encodeDiff8 dr dg db result outPos' of
+                         Just act -> act
+                         _ -> do runningPx <- A.unsafeRead running hash
+                                 fromJust $ encodeIndex px (fromIntegral hash) runningPx result outPos'
+                                        <|> encodeDiff16 dr dg db result outPos'
+                                        <|> encodeDiff24 dr dg db 0 result outPos'
+                                        <|> encodeColor px prevPx result outPos'
 
-        A.unsafeWrite running hash px
-        let tryRun pos runLen
-              | pos + 3 <= inLen = do
-                let thisPixel = readPixel3 inBytes pos
-                if thisPixel /= px || runLen >= maxRunLen
-                   then (pos, runLen, thisPixel)
-                   else tryRun (pos + 3) (runLen + 1)
-              | otherwise = (pos + 3, runLen, px)
+          A.unsafeWrite running hash px
 
-        let (afterRun, runLen, nextPix) = tryRun (inPos + 3) 0
-        outPos' <- encodeRun runLen result (outPos + pxDiff)
+          step (inPos + 3) 0 px (outPos' + pxDiff)
+        | runLen /= 0 = encodeRun runLen result outPos
+        | otherwise = pure outPos
 
-        if afterRun <= inLen
-           then step afterRun outPos' nextPix px
-           else pure outPos'
-  step startPos headerLen (readPixel3 inBytes startPos) initPixel
+  step startPos 0 initPixel headerLen
   where
     inLen = BS.length inBytes
 {-# INLINE encodeIntoArray #-}
@@ -159,9 +158,7 @@ encodeRaw :: Header -> BS.ByteString -> Int -> A.UArray Int Word8
 encodeRaw header inBytes startPos = A.runSTUArray $ do
   result <- A.unsafeNewArray_ (0, maxLen - 1)
   forM_ [0 .. headerLen - 1] $ \i -> A.unsafeWrite result i (headerBS ! i)
-  final <- if startPos < BS.length inBytes
-              then encodeIntoArray headerLen inBytes startPos result
-              else pure headerLen
+  final <- encodeIntoArray headerLen inBytes startPos result
   forM_ [0..3] $ \i -> A.unsafeWrite result (final + i) 0
   pure $ unsafeShrink result (final + 4)
   where
