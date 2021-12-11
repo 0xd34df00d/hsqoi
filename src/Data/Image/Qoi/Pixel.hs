@@ -8,12 +8,15 @@
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BinaryLiterals #-}
 {-# OPTIONS_GHC -O2 -fllvm #-}
 
 module Data.Image.Qoi.Pixel where
 
 import qualified Data.Array.Base as A
+import qualified Data.ByteString as BS
 import Control.Monad.ST
+import Data.Bits
 import Data.Word
 import GHC.Base
 import GHC.ST
