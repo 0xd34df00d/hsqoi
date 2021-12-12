@@ -98,9 +98,6 @@ encodeColor px1 px0 out outPos = Just $ do
                     .|.  fromIntegral ha
 {-# INLINE encodeColor #-}
 
-maxRunLen :: Int
-maxRunLen = 8224
-
 encodeRun :: Int -> A.STUArray s Int Word8 -> Int -> ST s Int
 encodeRun runLen out outPos
   | runLen == 0 = pure outPos
