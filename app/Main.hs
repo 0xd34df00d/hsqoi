@@ -6,6 +6,7 @@ module Main where
 
 import qualified Data.Array.Base as A
 import qualified Data.Array.IO as A
+import qualified Data.ByteString as BS
 import Codec.Picture.Png
 import Codec.Picture.Types
 import Data.Binary.Combinators
@@ -52,8 +53,14 @@ main = getArgs >>=
                 Right (header, pixels) -> void $ writeDynamicPng outFile $ toImage header pixels
         ["encode_raw", inFile, width, height] -> do
            bs <- unsafeMMapFile inFile
-           print $ A.bounds $ encodeRaw (Header matchBytes (read width) (read height) 3 0) bs 0
+           let w' = read width
+               h' = read height
+               chans = fromIntegral $ fromIntegral (BS.length bs) `div` w' `div` h'
+           print $ A.bounds $ encodeRaw (Header matchBytes w' h' chans 0) bs 0
         ["encode_raw", inFile, width, height, outFile] -> do
            bs <- unsafeMMapFile inFile
-           dumpUArray outFile $ encodeRaw (Header matchBytes (read width) (read height) 3 0) bs 0
+           let w' = read width
+               h' = read height
+               chans = fromIntegral $ fromIntegral (BS.length bs) `div` w' `div` h'
+           dumpUArray outFile $ encodeRaw (Header matchBytes w' h' chans 0) bs 0
         _ -> putStrLn "Wrong usage"
