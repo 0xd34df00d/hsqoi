@@ -100,9 +100,6 @@ instance A.IArray A.UArray Pixel4 where
   {-# INLINE unsafeAt #-}
 
 class (Eq a, forall s. A.MArray (A.STUArray s) a (ST s)) => Pixel a where
-  addRGB  :: a -> Word8 -> Word8 -> Word8 -> a
-  addRGBA :: a -> Word8 -> Word8 -> Word8 -> Word8 -> a
-
   toRGBA :: a -> (Word8, Word8, Word8, Word8)
   fromRGBA :: Word8 -> Word8 -> Word8 -> Word8 -> a
 
@@ -113,10 +110,6 @@ bytize :: Word32 -> Word32
 bytize = (.&. 0b11111111)
 
 instance Pixel Pixel3 where
-  addRGB (Pixel3 r g b) dr dg db = Pixel3 (r + dr) (g + dg) (b + db)
-  {-# INLINE addRGB #-}
-  addRGBA (Pixel3 r g b) dr dg db _ = Pixel3 (r + dr) (g + dg) (b + db)
-  {-# INLINE addRGBA #-}
   toRGBA (Pixel3 r g b) = (r, g, b, 255)
   {-# INLINE toRGBA #-}
   fromRGBA r g b _ = Pixel3 r g b
@@ -128,13 +121,6 @@ instance Pixel Pixel3 where
   {-# INLINE channelCount #-}
 
 instance Pixel Pixel4 where
-  addRGB px dr dg db = addRGBA px dr dg db 0
-  {-# INLINE addRGB #-}
-  addRGBA (Pixel4 rgba) dr dg db da = Pixel4 $ (rgba .>>. 24 + fromIntegral dr) .<<. 24
-                                    .|. bytize (rgba .>>. 16 + fromIntegral dg) .<<. 16
-                                    .|. bytize (rgba .>>.  8 + fromIntegral db) .<<. 8
-                                    .|. bytize (rgba + fromIntegral da)
-  {-# INLINE addRGBA #-}
   toRGBA (Pixel4 rgba) = ( fromIntegral $ rgba .>>. 24
                          , fromIntegral $ rgba .>>. 16
                          , fromIntegral $ rgba .>>. 8
@@ -151,6 +137,15 @@ instance Pixel Pixel4 where
   {-# INLINE readPixel #-}
   channelCount _ = 4
   {-# INLINE channelCount #-}
+
+addRGB :: Pixel pixel => pixel -> Word8 -> Word8 -> Word8 -> pixel
+addRGB px dr dg db = addRGBA px dr dg db 0
+{-# INLINE addRGB #-}
+
+addRGBA :: Pixel pixel => pixel -> Word8 -> Word8 -> Word8 -> Word8 -> pixel
+addRGBA px dr dg db da = let (r, g, b, a) = toRGBA px
+                          in fromRGBA (r + dr) (g + dg) (b + db) (a + da)
+{-# INLINE addRGBA #-}
 
 pixelHash :: (Num a, Pixel pixel) => pixel -> a
 pixelHash px = fromIntegral $ (r `xor` g `xor` b `xor` a) .&. 0b00111111
