@@ -72,6 +72,27 @@ instance Pixel pixel => Arbitrary (Image pixel) where
                              , genPixel
                              ]
 
+  shrink Image { .. }
+    | iHeight > 1 = [ Image
+                      { iWidth = iWidth
+                      , iHeight = iHeight - 1
+                      , iBytes = ShowAsBytes $ dropIthChunk (iWidth * chans) i $ bytes iBytes
+                      }
+                    | i <- [ 0 .. iHeight - 1 ]
+                    ]
+    | iWidth > 1 = [ Image
+                      { iWidth = iWidth - 1
+                      , iHeight = iHeight
+                      , iBytes = ShowAsBytes $ dropIthChunk chans i $ bytes iBytes
+                      }
+                   | i <- [0 .. iWidth - 1]
+                   ]
+    | otherwise = []
+    where
+      chans = channelCount @pixel Proxy
+      dropIthChunk chunk i str = BS.take (chunk * i) str
+                              <> BS.drop (chunk * (i + 1)) str
+
 toArray :: forall pixel. (Pixel pixel, A.IArray A.UArray pixel) => BS.ByteString -> A.UArray Int pixel
 toArray bs = A.array (0, pxCnt - 1) [ (i, fromRGBA r g b a)
                                     | i <- [0..pxCnt - 1]
