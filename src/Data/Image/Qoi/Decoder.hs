@@ -27,17 +27,17 @@ import Data.Image.Qoi.Util
 
 data ChunkResult pixel
   = One pixel
-  | Repeat pixel Int
+  | Repeat Int
   | Lookback Int
   | Stop
 
 peekChunk :: Pixel pixel => BS.ByteString -> Int -> pixel -> (Int, ChunkResult pixel)
 peekChunk str pos prevPixel
   | byte .>>. 6 == 0     = (1, Lookback $ fromIntegral $ byte .&. 0b00111111)
-  | byte .>>. 5 == 0b010 = (1, Repeat prevPixel $ fromIntegral $ 1 + byte .&. 0b00011111)
-  | byte .>>. 5 == 0b011 = (2, Repeat prevPixel $ 33 + (fromIntegral (byte .&. 0b00011111) .<<. 8
-                                                    .|. fromIntegral (str ! pos + 1)
-                                                       )
+  | byte .>>. 5 == 0b010 = (1, Repeat $ fromIntegral $ 1 + byte .&. 0b00011111)
+  | byte .>>. 5 == 0b011 = (2, Repeat $ 33 + (fromIntegral (byte .&. 0b00011111) .<<. 8
+                                          .|. fromIntegral (str ! pos + 1)
+                                             )
                            )
   | byte .>>. 6 == 0b10  = let dr = (byte .>>. 4 .&. 0b11) - 2
                                dg = (byte .>>. 2 .&. 0b11) - 2
@@ -81,16 +81,15 @@ decodePixels str strFrom n = A.runSTUArray $ do
         | outPos < n = do
             let (diff, chunk) = peekChunk str inPos prevPixel
             case chunk of
-                 One px        -> do A.unsafeWrite mvec outPos px
-                                     updateRunning running px
-                                     step (inPos + diff) (outPos + 1)   px
-                 Lookback pos  -> do px <- A.unsafeRead running pos
-                                     A.unsafeWrite mvec outPos px
-                                     step (inPos + diff) (outPos + 1)   px
-                 Repeat px cnt -> do forM_ [0..cnt - 1] $ \i -> A.unsafeWrite mvec (outPos + i) px
-                                     updateRunning running px
-                                     step (inPos + diff) (outPos + cnt) px
-                 Stop          -> pure outPos
+                 One px       -> do A.unsafeWrite mvec outPos px
+                                    updateRunning running px
+                                    step (inPos + diff) (outPos + 1)   px
+                 Lookback pos -> do px <- A.unsafeRead running pos
+                                    A.unsafeWrite mvec outPos px
+                                    step (inPos + diff) (outPos + 1)   px
+                 Repeat cnt   -> do forM_ [0 .. cnt - 1] $ \i -> A.unsafeWrite mvec (outPos + i) prevPixel
+                                    step (inPos + diff) (outPos + cnt) prevPixel
+                 Stop         -> pure outPos
         | otherwise = pure outPos
   finish <- step strFrom 0 (fromRGBA 0 0 0 255)
 
