@@ -70,6 +70,7 @@ peekChunk str pos prevPixel
   | otherwise = (0, Stop)
   where
     byte = str ! pos
+{-# INLINE peekChunk #-}
 
 decodePixels :: Pixel pixel => BS.ByteString -> Int -> Int -> A.UArray Int pixel
 decodePixels str strFrom n = A.runSTUArray $ do
@@ -96,6 +97,7 @@ decodePixels str strFrom n = A.runSTUArray $ do
   forM_ [finish .. n - 1] $ \i -> A.unsafeWrite mvec i (fromRGBA 0 0 0 255)
 
   pure $ unsafeShrink mvec n
+{-# INLINE decodePixels #-}
 
 data SomePixels where
   Pixels3 :: A.UArray Int Pixel3 -> SomePixels
@@ -120,6 +122,8 @@ decodeWHeader str (Right (_, consumed, header))
   where
     decode' :: Pixel pixel => A.UArray Int pixel
     decode' = decodePixels str (fromIntegral consumed) (fromIntegral $ hWidth header * hHeight header)
+    {-# INLINE decode' #-}
 
 decodeQoi :: BS.ByteString -> Either DecodeError (Header, SomePixels)
 decodeQoi str = decodeWHeader str $ decodeOrFail $ BSL.fromStrict $ BS.take 14 str
+{-# NOINLINE decodeQoi #-}
