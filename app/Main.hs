@@ -23,11 +23,11 @@ import Data.Image.Qoi.Pixel
 toImage :: Header -> SomePixels -> DynamicImage
 toImage Header { .. } (Pixels3 pixels) = ImageRGB8 $ generateImage f (fromIntegral hWidth) (fromIntegral hHeight)
   where
-    f x y = let Pixel3 r g b = pixels A.! (y * fromIntegral hWidth + x)
+    f x y = let (r, g, b, _) = toRGBA $ pixels A.! (y * fromIntegral hWidth + x)
              in PixelRGB8 r g b
 toImage Header { .. } (Pixels4 pixels) = ImageRGBA8 $ generateImage f (fromIntegral hWidth) (fromIntegral hHeight)
   where
-    f x y = let Pixel4 r g b a = pixels A.! (y * fromIntegral hWidth + x)
+    f x y = let (r, g, b, a) = toRGBA $ pixels A.! (y * fromIntegral hWidth + x)
              in PixelRGBA8 r g b a
 
 dumpUArray :: FilePath -> A.UArray Int Word8 -> IO ()
