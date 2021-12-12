@@ -62,14 +62,10 @@ peekChunk str pos prevPixel
                                 hb = byte .>>. 1 .&. 0b1
                                 ha = byte        .&. 0b1
                                 (r, g, b, a) = toRGBA prevPixel
-                                r' = (negate hr .&. (str ! pos + 1))
-                                 .|. (hr - 1)   .&. r
-                                g' = (negate hg .&. (str ! pos + 1 + fromIntegral hr))
-                                 .|. (hg - 1)   .&. g
-                                b' = (negate hb .&. (str ! pos + 1 + fromIntegral (hr + hg)))
-                                 .|. (hb - 1)   .&. b
-                                a' = (negate ha .&. (str ! pos + 1 + fromIntegral (hr + hg + hb)))
-                                 .|. (ha - 1)   .&. a
+                                r' = if hr == 1 then str ! pos + 1 else r
+                                g' = if hg == 1 then str ! pos + 1 + fromIntegral hr else g
+                                b' = if hb == 1 then str ! pos + 1 + fromIntegral (hr + hg) else b
+                                a' = if ha == 1 then str ! pos + 1 + fromIntegral (hr + hg + hb) else a
                              in (1 + fromIntegral (hr + hg + hb + ha), One $ fromRGBA r' g' b' a')
   | otherwise = (0, Stop)
   where
