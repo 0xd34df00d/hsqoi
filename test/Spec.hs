@@ -7,6 +7,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE TupleSections #-}
 
 import qualified Data.Array.IArray as A
 import qualified Data.Array.Unboxed as A
@@ -58,36 +59,42 @@ instance Pixel pixel => Arbitrary (Image pixel) where
 
     px0 <- genPixel
 
-    pixels <- V.iterateNM (width * height) step px0
-    pure $ Image width height $ ShowAsBytes $ BS.pack $ V.toList $ V.concatMap toComponents pixels
+    pixels <- V.iterateNM (width * height) step (px0, 0)
+    pure $ Image width height $ ShowAsBytes $ BS.pack $ V.toList $ V.concatMap (toComponents . fst) pixels
     where
       toComponents :: pixel -> V.Vector Word8
       toComponents px = if channelCount @pixel Proxy == 3
                            then let (r, g, b, _) = toRGBA px in [r, g, b]
                            else let (r, g, b, a) = toRGBA px in [r, g, b, a]
-      step prevPixel = oneof [ pure prevPixel
-                             , genDiffBounded False 2 prevPixel
-                             , genDiffBounded False 8 prevPixel
-                             , genDiffBounded True 16 prevPixel
-                             , genPixel
-                             ]
+
+      step (prevPixel, 0) = do
+        runToss <- chooseInt (1, 100)
+        if runToss >= 10
+           then do nextPixel <- oneof [ genDiffBounded False 2 prevPixel
+                                      , genDiffBounded False 8 prevPixel
+                                      , genDiffBounded True 16 prevPixel
+                                      , genPixel
+                                      ]
+                   pure (nextPixel, 0)
+           else (prevPixel,) <$> chooseInt (1, runToss * 1000)
+      step (prevPixel, n) = pure (prevPixel, n - 1)
 
   shrink Image { .. } = [ Image
-                           { iWidth = iWidth
-                           , iHeight = iHeight - 1
-                           , iBytes = ShowAsBytes $ dropIthRow i $ bytes iBytes
-                           }
-                         | i <- [ 0 .. iHeight - 1 ]
-                         ]
-                         <>
-                         [ Image
-                           { iWidth = iWidth - 1
-                           , iHeight = iHeight
-                           , iBytes = ShowAsBytes $ dropJthCol j $ bytes iBytes
-                           }
-                         | iHeight < 5
-                         , j <- [0 .. iWidth - 1]
-                         ]
+                          { iWidth = iWidth
+                          , iHeight = iHeight - 1
+                          , iBytes = ShowAsBytes $ dropIthRow i $ bytes iBytes
+                          }
+                        | i <- [ 0 .. iHeight - 1 ]
+                        ]
+                        <>
+                        [ Image
+                          { iWidth = iWidth - 1
+                          , iHeight = iHeight
+                          , iBytes = ShowAsBytes $ dropJthCol j $ bytes iBytes
+                          }
+                        | iHeight < 5
+                        , j <- [0 .. iWidth - 1]
+                        ]
     where
       chans = channelCount @pixel Proxy
       dropIthRow i str = BS.take (iWidth * chans * i) str
