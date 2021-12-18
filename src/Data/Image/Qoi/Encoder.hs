@@ -161,7 +161,7 @@ encodeIntoArray proxy headerLen inBytes startPos result = do
 {-# INLINE encodeIntoArray #-}
 
 encodeRaw :: Header -> BS.ByteString -> Int -> A.UArray Int Word8
-encodeRaw header inBytes startPos = A.runSTUArray $ do
+encodeRaw header inBytes' startPos = A.runSTUArray $ do
   result <- A.unsafeNewArray_ (0, maxLen - 1)
   forM_ [0 .. headerLen - 1] $ \i -> A.unsafeWrite result i (headerBS ! i)
   final <- if hChannels header == 3
@@ -170,5 +170,6 @@ encodeRaw header inBytes startPos = A.runSTUArray $ do
   forM_ [0..3] $ \i -> A.unsafeWrite result (final + i) 0
   pure $ unsafeShrink result (final + 4)
   where
+    inBytes = unoffsetBS inBytes'
     (maxLen, headerBS) = maxResultSize header
     headerLen = BS.length headerBS

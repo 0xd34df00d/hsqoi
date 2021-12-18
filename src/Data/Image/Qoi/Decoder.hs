@@ -125,5 +125,5 @@ decodeWHeader str (Right (_, consumed, header))
     {-# INLINE decode' #-}
 
 decodeQoi :: BS.ByteString -> Either DecodeError (Header, SomePixels)
-decodeQoi str = decodeWHeader str $ decodeOrFail $ BSL.fromStrict $ BS.take 14 str
+decodeQoi str = decodeWHeader (unoffsetBS str) $ decodeOrFail $ BSL.fromStrict $ BS.take 14 str
 {-# NOINLINE decodeQoi #-}

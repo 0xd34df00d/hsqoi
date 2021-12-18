@@ -23,6 +23,9 @@ infix 4 !
 (BSI.PS x _ _) ! i = BSI.accursedUnutterablePerformIO $ withForeignPtr x $ \p -> peekByteOff p i
 {-# INLINE (!) #-}
 
+unoffsetBS :: BS.ByteString -> BS.ByteString
+unoffsetBS (BSI.PS ptr offset len) = BSI.PS (ptr `plusForeignPtr` offset) 0 len
+
 unsafeShrink :: A.STUArray s Int e -> Int -> A.STUArray s Int e
 unsafeShrink arr@(A.STUArray l _ n marr) cnt
   | cnt >= n = arr
