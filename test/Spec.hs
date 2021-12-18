@@ -72,26 +72,31 @@ instance Pixel pixel => Arbitrary (Image pixel) where
                              , genPixel
                              ]
 
-  shrink Image { .. }
-    | iHeight > 1 = [ Image
-                      { iWidth = iWidth
-                      , iHeight = iHeight - 1
-                      , iBytes = ShowAsBytes $ dropIthChunk (iWidth * chans) i $ bytes iBytes
-                      }
-                    | i <- [ 0 .. iHeight - 1 ]
-                    ]
-    | iWidth > 1 = [ Image
-                      { iWidth = iWidth - 1
-                      , iHeight = iHeight
-                      , iBytes = ShowAsBytes $ dropIthChunk chans i $ bytes iBytes
-                      }
-                   | i <- [0 .. iWidth - 1]
-                   ]
-    | otherwise = []
+  shrink Image { .. } = [ Image
+                           { iWidth = iWidth
+                           , iHeight = iHeight - 1
+                           , iBytes = ShowAsBytes $ dropIthRow i $ bytes iBytes
+                           }
+                         | i <- [ 0 .. iHeight - 1 ]
+                         ]
+                         <>
+                         [ Image
+                           { iWidth = iWidth - 1
+                           , iHeight = iHeight
+                           , iBytes = ShowAsBytes $ dropJthCol j $ bytes iBytes
+                           }
+                         | iHeight < 5
+                         , j <- [0 .. iWidth - 1]
+                         ]
     where
       chans = channelCount @pixel Proxy
-      dropIthChunk chunk i str = BS.take (chunk * i) str
-                              <> BS.drop (chunk * (i + 1)) str
+      dropIthRow i str = BS.take (iWidth * chans * i) str
+                      <> BS.drop (iWidth * chans * (i + 1)) str
+      dropJthCol j str
+        | BS.null str = str
+        | otherwise = let (row, rest) = BS.splitAt (iWidth * chans) str
+                          (left, right) = BS.splitAt (j * chans) row
+                       in left <> BS.drop chans right <> dropJthCol j rest
 
 toArray :: forall pixel. (Pixel pixel, A.IArray A.UArray pixel) => BS.ByteString -> A.UArray Int pixel
 toArray bs = A.array (0, pxCnt - 1) [ (i, fromRGBA r g b a)
