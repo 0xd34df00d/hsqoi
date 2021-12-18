@@ -23,7 +23,7 @@ dependencies:
 - base >= 4.7 && < 5
 - array
 - binary
-- binary-generic-combinators
+- binary-generic-combinators >= 0.4.4.0
 - bytestring
 - bytestring-mmap
 - vector

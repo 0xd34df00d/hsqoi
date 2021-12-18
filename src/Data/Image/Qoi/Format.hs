@@ -10,7 +10,7 @@ import Data.Binary.Combinators
 import GHC.Generics
 
 data Header = Header
-  { hMagic :: MatchBytes "QOI magic" '[ 0x71, 0x6f, 0x69, 0x66 ]
+  { hMagic :: MatchASCII "QOI magic" "qoif"
   , hWidth :: Word32
   , hHeight :: Word32
   , hChannels :: Word8

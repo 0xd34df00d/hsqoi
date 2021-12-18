@@ -4,4 +4,4 @@ resolver:
 packages:
 - .
 extra-deps:
-- binary-generic-combinators-0.4.3.0
+- binary-generic-combinators-0.4.4.0

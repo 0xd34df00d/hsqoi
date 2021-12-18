@@ -56,11 +56,11 @@ main = getArgs >>=
            let w' = read width
                h' = read height
                chans = fromIntegral $ fromIntegral (BS.length bs) `div` w' `div` h'
-           print $ A.bounds $ encodeRaw (Header matchBytes w' h' chans 0) bs 0
+           print $ A.bounds $ encodeRaw (Header matchASCII w' h' chans 0) bs 0
         ["encode_raw", inFile, width, height, outFile] -> do
            bs <- unsafeMMapFile inFile
            let w' = read width
                h' = read height
                chans = fromIntegral $ fromIntegral (BS.length bs) `div` w' `div` h'
-           dumpUArray outFile $ encodeRaw (Header matchBytes w' h' chans 0) bs 0
+           dumpUArray outFile $ encodeRaw (Header matchASCII w' h' chans 0) bs 0
         _ -> putStrLn "Wrong usage"
