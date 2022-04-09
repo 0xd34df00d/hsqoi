@@ -21,6 +21,7 @@ import Data.Bits
 import Data.Word
 import Foreign
 import GHC.Base
+import GHC.ByteOrder
 import GHC.ST
 import GHC.Word
 
@@ -120,17 +121,22 @@ instance Pixel Pixel3 where
   channelCount _ = 3
   {-# INLINE channelCount #-}
 
+rShift, gShift, bShift, aShift :: Int
+(rShift, gShift, bShift, aShift) = case targetByteOrder of
+                                        BigEndian -> (24, 16, 8, 0)
+                                        LittleEndian -> (0, 8, 16, 24)
+
 instance Pixel Pixel4 where
-  toRGBA (Pixel4 rgba) = ( fromIntegral $ rgba .>>. 24
-                         , fromIntegral $ rgba .>>. 16
-                         , fromIntegral $ rgba .>>. 8
-                         , fromIntegral   rgba
+  toRGBA (Pixel4 rgba) = ( fromIntegral $ rgba .>>. rShift
+                         , fromIntegral $ rgba .>>. gShift
+                         , fromIntegral $ rgba .>>. bShift
+                         , fromIntegral $ rgba .>>. aShift
                          )
   {-# INLINE toRGBA #-}
-  fromRGBA r g b a = Pixel4 $ fromIntegral r .<<. 24
-                          .|. fromIntegral g .<<. 16
-                          .|. fromIntegral b .<<. 8
-                          .|. fromIntegral a
+  fromRGBA r g b a = Pixel4 $ fromIntegral r .<<. rShift
+                          .|. fromIntegral g .<<. gShift
+                          .|. fromIntegral b .<<. bShift
+                          .|. fromIntegral a .<<. aShift
   {-# INLINE fromRGBA #-}
 
   readPixel (BSI.PS x _ _) pos = Pixel4 $ BSI.accursedUnutterablePerformIO $ withForeignPtr x $ \p -> peek (p `plusPtr` pos)
