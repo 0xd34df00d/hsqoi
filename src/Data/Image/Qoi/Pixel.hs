@@ -154,7 +154,7 @@ addRGBA px dr dg db da = let (r, g, b, a) = toRGBA px
 {-# INLINE addRGBA #-}
 
 pixelHash :: (Num a, Pixel pixel) => pixel -> a
-pixelHash px = fromIntegral $ (r `xor` g `xor` b `xor` a) .&. 0b00111111
+pixelHash px = fromIntegral $ (r * 3 +  g * 5 +  b * 7 + a * 11) .&. 0b00111111
   where (r, g, b, a) = toRGBA px
 {-# INLINE pixelHash #-}
 

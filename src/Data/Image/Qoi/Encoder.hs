@@ -38,38 +38,27 @@ isBounded d h = d + h < 2 * h
 
 encodeDiff8 :: Word8 -> Word8 -> Word8 -> Word8 -> VarEncoder s
 encodeDiff8 dr dg db 0 out outPos
-  | (`isBounded` 2) `all` [dr, dg, db] = let byte = 0b10000000 .|. ((dr + 2) .<<. 4)
+  | (`isBounded` 2) `all` [dr, dg, db] = let byte = 0b01000000 .|. ((dr + 2) .<<. 4)
                                                                .|. ((dg + 2) .<<. 2)
                                                                .|.  (db + 2)
                                           in Just $ A.unsafeWrite out outPos byte $> 1
 encodeDiff8 _ _ _ _ _ _  = Nothing
 {-# INLINE encodeDiff8 #-}
 
-encodeDiff16 :: Word8 -> Word8 -> Word8 -> Word8 -> VarEncoder s
-encodeDiff16 dr dg db 0 out outPos
-  | uncurry isBounded `all` [(dr, 16), (dg, 8), (db, 8)] = let b1 = 0b11000000 .|. (dr + 16)
-                                                               b2 = (dg + 8) .<<. 4
-                                                                .|. (db + 8)
-                                                            in Just $ do A.unsafeWrite out outPos       b1
-                                                                         A.unsafeWrite out (outPos + 1) b2
-                                                                         pure 2
-encodeDiff16 _ _ _ _ _ _  = Nothing
-{-# INLINE encodeDiff16 #-}
-
-encodeDiff24 :: Word8 -> Word8 -> Word8 -> Word8 -> VarEncoder s
-encodeDiff24 dr dg db da out outPos
-  | (`isBounded` 16) `all` [dr, dg, db, da] = let bytes :: Word32
-                                                  bytes = (0b11100000 .<<. 16)
-                                                      .|. fromIntegral (dr + 16) .<<. 15
-                                                      .|. fromIntegral (dg + 16) .<<. 10
-                                                      .|. fromIntegral (db + 16) .<<. 5
-                                                      .|. fromIntegral (da + 16)
-                                               in Just $ do A.unsafeWrite out outPos       (fromIntegral $ bytes .>>. 16)
-                                                            A.unsafeWrite out (outPos + 1) (fromIntegral $ bytes .>>. 8)
-                                                            A.unsafeWrite out (outPos + 2) (fromIntegral   bytes)
-                                                            pure 3
-  | otherwise = Nothing
-{-# INLINE encodeDiff24 #-}
+encodeDiffLuma :: Word8 -> Word8 -> Word8 -> Word8 -> VarEncoder s
+encodeDiffLuma dr dg db 0 out outPos
+  | dg `isBounded` 32
+  , uncurry isBounded `all` [(dr_dg, 8), (db_dg, 8)] = let b1 = 0b10000000 .|. (dg + 32)
+                                                           b2 = (dr_dg + 8) .<<. 4
+                                                            .|. (db_dg + 8)
+                                                        in Just $ do A.unsafeWrite out outPos       b1
+                                                                     A.unsafeWrite out (outPos + 1) b2
+                                                                     pure 2
+  where
+    dr_dg = dr - dg
+    db_dg = db - dg
+encodeDiffLuma _ _ _ _ _ _  = Nothing
+{-# INLINE encodeDiffLuma #-}
 
 encodeIndex :: Eq pixel => pixel -> Word8 -> pixel -> VarEncoder s
 encodeIndex px hash runningPx out outPos
@@ -79,33 +68,21 @@ encodeIndex px hash runningPx out outPos
 
 encodeColor :: Pixel pixel => pixel -> pixel -> VarEncoder s
 encodeColor px1 px0 out outPos = Just $ do
-  A.unsafeWrite out outPos bh
-  when (hr == 1) $ A.unsafeWrite out (outPos + 1) r1
-  when (hg == 1) $ A.unsafeWrite out (outPos + 1 + hr) g1
-  when (hb == 1) $ A.unsafeWrite out (outPos + 1 + hr + hg) b1
-  when (ha == 1) $ A.unsafeWrite out (outPos + 1 + hr + hg + hb) a1
-  pure (1 + hr + hg + hb + ha)
+  A.unsafeWrite out outPos $ 0b11111110 .|. fromIntegral ha
+  A.unsafeWrite out (outPos + 1) r1
+  A.unsafeWrite out (outPos + 2) g1
+  A.unsafeWrite out (outPos + 3) b1
+  when (ha == 1) $ A.unsafeWrite out (outPos + 4) a1
+  pure (4 + ha)
   where
     (r1, g1, b1, a1) = toRGBA px1
-    (r0, g0, b0, a0) = toRGBA px0
-    hr = fromEnum $ r1 /= r0
-    hg = fromEnum $ g1 /= g0
-    hb = fromEnum $ b1 /= b0
+    (_,  _,  _,  a0) = toRGBA px0
     ha = fromEnum $ a1 /= a0
-    bh = 0b11110000 .|. (fromIntegral hr .<<. 3)
-                    .|. (fromIntegral hg .<<. 2)
-                    .|. (fromIntegral hb .<<. 1)
-                    .|.  fromIntegral ha
 {-# INLINE encodeColor #-}
 
 encodeRun :: Int -> A.STUArray s Int Word8 -> Int -> ST s Int
-encodeRun runLen out outPos
-  | runLen == 0 = pure outPos
-  | runLen <= 32 = A.unsafeWrite out outPos (0b01000000 .|. fromIntegral (runLen - 1)) $> outPos + 1
-  | otherwise = do let runLen' = runLen - 33
-                   A.unsafeWrite out outPos       (0b01100000 .|. fromIntegral (runLen' .>>. 8))
-                   A.unsafeWrite out (outPos + 1) (fromIntegral runLen')
-                   pure $ outPos + 2
+encodeRun 0 _ outPos = pure outPos
+encodeRun runLen out outPos = A.unsafeWrite out outPos (0b11000000 .|. fromIntegral (runLen - 1)) $> outPos + 1
 {-# INLINE encodeRun #-}
 
 maxResultSize :: Header -> (Int, BS.ByteString)
@@ -114,9 +91,9 @@ maxResultSize h@Header { .. } = (maxLen, headerBS)
     headerBS = BSL.toStrict $ encode h
     maxLen = BS.length headerBS
            + fromIntegral (hChannels + 1) * fromIntegral (hWidth * hHeight)
-           + 4 -- end padding
+           + 8 -- end padding
 
-encodeIntoArray :: forall pixel s. Pixel pixel
+encodeIntoArray :: forall pixel s. (Pixel pixel, Show pixel)
                 => Proxy pixel
                 -> Int
                 -> BS.ByteString
@@ -144,15 +121,13 @@ encodeIntoArray proxy headerLen inBytes startPos result = do
                          Just act -> act
                          _ -> do runningPx <- A.unsafeRead running hash
                                  fromJust $ encodeIndex px (fromIntegral hash) runningPx result outPos'
-                                        <|> encodeDiff16 dr dg db da result outPos'
-                                        <|> encodeDiff24 dr dg db da result outPos'
+                                        <|> encodeDiffLuma dr dg db da result outPos'
                                         <|> encodeColor px prevPx result outPos'
 
           A.unsafeWrite running hash px
 
           step (inPos + diff) 0 px (outPos' + pxDiff)
-        | runLen /= 0 = encodeRun runLen result outPos
-        | otherwise = pure outPos
+        | otherwise = encodeRun runLen result outPos
 
   step startPos 0 (fromRGBA 0 0 0 255) headerLen
   where
@@ -167,8 +142,9 @@ encodeRaw header inBytes' startPos = A.runSTUArray $ do
   final <- if hChannels header == 3
               then encodeIntoArray @Pixel3 Proxy headerLen inBytes startPos result
               else encodeIntoArray @Pixel4 Proxy headerLen inBytes startPos result
-  forM_ [0..3] $ \i -> A.unsafeWrite result (final + i) 0
-  pure $ unsafeShrink result (final + 4)
+  forM_ [0..6] $ \i -> A.unsafeWrite result (final + i) 0
+  A.unsafeWrite result (final + 7) 1
+  pure $ unsafeShrink result (final + 8)
   where
     inBytes = unoffsetBS inBytes'
     (maxLen, headerBS) = maxResultSize header

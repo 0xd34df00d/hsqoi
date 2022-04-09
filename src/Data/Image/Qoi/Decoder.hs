@@ -1,5 +1,4 @@
 {-# LANGUAGE Strict #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE BinaryLiterals #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeApplications #-}
@@ -20,6 +19,7 @@ import Control.Monad
 import Data.Binary
 import Data.Binary.Get
 import Data.Bits
+import Data.Proxy
 
 import Data.Image.Qoi.Format
 import Data.Image.Qoi.Pixel
@@ -31,43 +31,32 @@ data ChunkResult pixel
   | Lookback Int
   | Stop
 
-peekChunk :: Pixel pixel => BS.ByteString -> Int -> pixel -> (Int, ChunkResult pixel)
+peekChunk :: forall pixel. Pixel pixel => BS.ByteString -> Int -> pixel -> (Int, ChunkResult pixel)
 peekChunk str pos prevPixel
-  | byte .>>. 6 == 0     = (1, Lookback $ fromIntegral $ byte .&. 0b00111111)
-  | byte .>>. 5 == 0b010 = (1, Repeat $ fromIntegral $ 1 + byte .&. 0b00011111)
-  | byte .>>. 5 == 0b011 = (2, Repeat $ 33 + (fromIntegral (byte .&. 0b00011111) .<<. 8
-                                          .|. fromIntegral (str ! pos + 1)
-                                             )
-                           )
-  | byte .>>. 6 == 0b10  = let dr = (byte .>>. 4 .&. 0b11) - 2
-                               dg = (byte .>>. 2 .&. 0b11) - 2
-                               db = (byte        .&. 0b11) - 2
-                            in (1, One $ addRGB prevPixel dr dg db)
-  | byte .>>. 5 == 0b110 = let next = str ! pos + 1
-                               dr = (byte .&. 0b00011111) - 16
-                               dg = (next .>>. 4)         - 8
-                               db = (next .&. 0b00001111) - 8
-                            in (2, One $ addRGB prevPixel dr dg db)
-  | byte .>>. 4 == 0b1110 = let threeBytes :: Word32
-                                threeBytes = fromIntegral byte .<<. 16
-                                         .|. fromIntegral (str ! pos + 1) .<<. 8
-                                         .|. fromIntegral (str ! pos + 2)
-                                dr = fromIntegral (threeBytes .>>. 15 .&. 0b11111) - 16
-                                dg = fromIntegral (threeBytes .>>. 10 .&. 0b11111) - 16
-                                db = fromIntegral (threeBytes .>>. 5  .&. 0b11111) - 16
-                                da = fromIntegral (threeBytes         .&. 0b11111) - 16
-                             in (3, One $ addRGBA prevPixel dr dg db da)
-  | byte .>>. 4 == 0b1111 = let hr = byte .>>. 3 .&. 0b1
-                                hg = byte .>>. 2 .&. 0b1
-                                hb = byte .>>. 1 .&. 0b1
-                                ha = byte        .&. 0b1
-                                (r, g, b, a) = toRGBA prevPixel
-                                r' = if hr == 1 then str ! pos + 1 else r
-                                g' = if hg == 1 then str ! pos + 1 + fromIntegral hr else g
-                                b' = if hb == 1 then str ! pos + 1 + fromIntegral (hr + hg) else b
-                                a' = if ha == 1 then str ! pos + 1 + fromIntegral (hr + hg + hb) else a
-                             in (1 + fromIntegral (hr + hg + hb + ha), One $ fromRGBA r' g' b' a')
-  | otherwise = (0, Stop)
+  | byte == 0b11111110 = let r' = str ! pos + 1
+                             g' = str ! pos + 2
+                             b' = str ! pos + 3
+                             (_, _, _, a) = toRGBA prevPixel
+                          in (4, One $ fromRGBA r' g' b' a)
+  | channelCount (Proxy :: Proxy pixel) == 4 &&
+    byte == 0b11111111 = let r' = str ! pos + 1
+                             g' = str ! pos + 2
+                             b' = str ! pos + 3
+                             a' = str ! pos + 4
+                          in (5, One $ fromRGBA r' g' b' a')
+  | otherwise = case byte .>>. 6 of
+                     0b00 -> (1, Lookback $ fromIntegral $ byte .&. 0b00111111)
+                     0b11 -> (1, Repeat $ fromIntegral $ 1 + byte .&. 0b00111111)
+                     0b01 -> let dr = byte .>>. 4 .&. 0b11 - 2
+                                 dg = byte .>>. 2 .&. 0b11 - 2
+                                 db = byte        .&. 0b11 - 2
+                              in (1, One $ addRGB prevPixel dr dg db)
+                     0b10 -> let dg = (byte .&. 0b00111111) - 32
+                                 nextByte = str ! pos + 1
+                                 dr = nextByte .>>. 4         - 8 + dg
+                                 db = nextByte .&. 0b00001111 - 8 + dg
+                              in (2, One $ addRGB prevPixel dr dg db)
+                     _ -> error "can't happen"
   where
     byte = str ! pos
 {-# INLINE peekChunk #-}
@@ -115,7 +104,8 @@ decodeWHeader :: BS.ByteString
               -> Either DecodeError (Header, SomePixels)
 decodeWHeader _ (Left (_, _, err)) = Left $ HeaderError err
 decodeWHeader str (Right (_, consumed, header))
-  | any (\i -> (str ! BS.length str - i) /= 0) [1..4] = Left UnpaddedFile
+  | any (\i -> (str ! BS.length str - i) /= 0) [2..8] ||
+    BS.last str /= 1 = Left UnpaddedFile
   | hChannels header == 3 = Right (header, Pixels3 decode')
   | hChannels header == 4 = Right (header, Pixels4 decode')
   | otherwise = Left $ UnsupportedChannels $ fromIntegral $ hChannels header

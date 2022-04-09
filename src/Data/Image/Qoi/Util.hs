@@ -33,5 +33,5 @@ unsafeShrink arr@(A.STUArray l _ n marr) cnt
 {-# INLINE unsafeShrink #-}
 
 maxRunLen :: Int
-maxRunLen = 8224
+maxRunLen = 62
 {-# INLINE maxRunLen #-}
