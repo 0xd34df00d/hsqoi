@@ -121,7 +121,7 @@ toArray bs = A.array (0, pxCnt - 1) [ (i, fromRGBA r g b a)
 
 imgProperty :: forall pixel. (Show pixel, Pixel pixel, A.IArray A.UArray pixel) => Image pixel -> IO ()
 imgProperty Image { .. } = do
-  let header = Header { hMagic = matchBytes
+  let header = Header { hMagic = matchASCII
                       , hWidth = fromIntegral iWidth
                       , hHeight = fromIntegral iHeight
                       , hChannels = chans
