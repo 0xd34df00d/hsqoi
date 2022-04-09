@@ -99,9 +99,9 @@ decodePixels str strFrom n = A.runSTUArray $ do
   pure $ unsafeShrink mvec n
 {-# INLINE decodePixels #-}
 
-data SomePixels where
-  Pixels3 :: A.UArray Int Pixel3 -> SomePixels
-  Pixels4 :: A.UArray Int Pixel4 -> SomePixels
+data SomePixels
+  = Pixels3 (A.UArray Int Pixel3)
+  | Pixels4 (A.UArray Int Pixel4)
   deriving (Show)
 
 data DecodeError
