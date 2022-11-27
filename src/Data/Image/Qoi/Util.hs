@@ -1,22 +1,27 @@
-{-# LANGUAGE Strict #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE BinaryLiterals #-}
+{-# LANGUAGE Strict #-}
 
 module Data.Image.Qoi.Util where
 
 import qualified Data.Array.Base as A
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BSI
+#if !(MIN_VERSION_base(4,17,0))
 import Data.Bits
+#endif
 import Data.Word
 import Foreign.ForeignPtr
 import Foreign.Storable (peekByteOff)
 
+#if !(MIN_VERSION_base(4,17,0))
 infix 8 .>>., .<<.
 (.>>.), (.<<.) :: Bits a => a -> Int -> a
 (.>>.) = shiftR
 (.<<.) = shiftL
 {-# INLINE (.<<.) #-}
 {-# INLINE (.>>.) #-}
+#endif
 
 infix 4 !
 (!) :: BS.ByteString -> Int -> Word8
