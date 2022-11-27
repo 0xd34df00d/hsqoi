@@ -20,7 +20,7 @@ extra-source-files:
 description:         Please see the README on GitHub at <https://github.com/0xd34df00d/hsqoi#readme>
 
 dependencies:
-- base >= 4.7 && < 5
+- base >= 4.15 && < 5
 - array
 - binary
 - binary-generic-combinators >= 0.4.4.0
