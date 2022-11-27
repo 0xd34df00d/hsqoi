@@ -3,5 +3,3 @@ resolver:
 #resolver: nightly-2021-12-04
 packages:
 - .
-extra-deps:
-- binary-generic-combinators-0.4.4.0
