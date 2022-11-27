@@ -13,6 +13,7 @@ import Data.Bits
 import Data.Word
 import Foreign.ForeignPtr
 import Foreign.Storable (peekByteOff)
+import GHC.ForeignPtr
 
 #if !(MIN_VERSION_base(4,17,0))
 infix 8 .>>., .<<.
@@ -25,7 +26,7 @@ infix 8 .>>., .<<.
 
 infix 4 !
 (!) :: BS.ByteString -> Int -> Word8
-(BSI.PS x _ _) ! i = BSI.accursedUnutterablePerformIO $ withForeignPtr x $ \p -> peekByteOff p i
+(BSI.PS x _ _) ! i = BSI.accursedUnutterablePerformIO $ unsafeWithForeignPtr x $ \p -> peekByteOff p i
 {-# INLINE (!) #-}
 
 unoffsetBS :: BS.ByteString -> BS.ByteString
