@@ -9,7 +9,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE BinaryLiterals #-}
-{-# OPTIONS_GHC -O2 -fllvm #-}
+{-# OPTIONS_GHC -O2 #-}
 
 module Data.Image.Qoi.Pixel where
 

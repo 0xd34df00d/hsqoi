@@ -3,7 +3,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -O2 -fllvm #-}
+{-# OPTIONS_GHC -O2 #-}
 
 module Data.Image.Qoi.Decoder
 ( decodeQoi

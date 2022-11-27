@@ -30,6 +30,7 @@ dependencies:
 
 ghc-options:
 - -Wall
+- -fllvm
 
 library:
   source-dirs: src

@@ -4,7 +4,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# OPTIONS_GHC -O2 -fllvm #-}
+{-# OPTIONS_GHC -O2 #-}
 
 module Data.Image.Qoi.Encoder
 ( encodeRaw
