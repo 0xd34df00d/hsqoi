@@ -139,7 +139,7 @@ instance Pixel Pixel4 where
                           .|. fromIntegral a .<<. aShift
   {-# INLINE fromRGBA #-}
 
-  readPixel (BSI.PS x _ _) pos = Pixel4 $ BSI.accursedUnutterablePerformIO $ withForeignPtr x $ \p -> peek (p `plusPtr` pos)
+  readPixel (BSI.PS x _ _) pos = Pixel4 $ BSI.accursedUnutterablePerformIO $ BSI.unsafeWithForeignPtr x $ \p -> peek (p `plusPtr` pos)
   {-# INLINE readPixel #-}
   channelCount _ = 4
   {-# INLINE channelCount #-}
