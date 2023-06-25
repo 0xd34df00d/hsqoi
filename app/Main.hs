@@ -14,7 +14,7 @@ import Data.Functor
 import GHC.Word
 import System.Environment
 import System.IO
-import System.IO.Posix.MMap
+import System.IO.MMap
 
 import Data.Image.Qoi.Encoder
 import Data.Image.Qoi.Format
@@ -39,7 +39,7 @@ dumpUArray file arr = withFile file WriteMode $ \h -> do
 main :: IO ()
 main = getArgs >>=
   \case ["decode", inFile] -> do
-           bs <- unsafeMMapFile inFile
+           bs <- mmapFileByteString inFile Nothing
            case decodeQoi bs of
                 Right (header, pixels) -> do print header
                                              case pixels of
@@ -47,18 +47,18 @@ main = getArgs >>=
                                                   Pixels4 pixels' -> print $ A.bounds pixels'
                 Left err -> putStrLn $ "Unable to decode: " <> show err
         ["decode", inFile, outFile] -> do
-           bs <- unsafeMMapFile inFile
+           bs <- mmapFileByteString inFile Nothing
            case decodeQoi bs of
                 Left err -> putStrLn $ "Unable to decode: " <> show err
                 Right (header, pixels) -> void $ writeDynamicPng outFile $ toImage header pixels
         ["encode_raw", inFile, width, height] -> do
-           bs <- unsafeMMapFile inFile
+           bs <- mmapFileByteString inFile Nothing
            let w' = read width
                h' = read height
                chans = fromIntegral $ fromIntegral (BS.length bs) `div` w' `div` h'
            print $ A.bounds $ encodeRaw (Header matchASCII w' h' chans 0) bs 0
         ["encode_raw", inFile, width, height, outFile] -> do
-           bs <- unsafeMMapFile inFile
+           bs <- mmapFileByteString inFile Nothing
            let w' = read width
                h' = read height
                chans = fromIntegral $ fromIntegral (BS.length bs) `div` w' `div` h'

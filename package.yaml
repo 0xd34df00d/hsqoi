@@ -25,7 +25,7 @@ dependencies:
 - binary
 - binary-generic-combinators >= 0.4.4.0
 - bytestring
-- bytestring-mmap
+- mmap
 - vector
 
 ghc-options:
