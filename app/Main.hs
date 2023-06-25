@@ -38,29 +38,29 @@ dumpUArray file arr = withFile file WriteMode $ \h -> do
 
 main :: IO ()
 main = getArgs >>=
-  \case ["decode", inFile] -> do
-           bs <- mmapFileByteString inFile Nothing
-           case decodeQoi bs of
-                Right (header, pixels) -> do print header
-                                             case pixels of
-                                                  Pixels3 pixels' -> print $ A.bounds pixels'
-                                                  Pixels4 pixels' -> print $ A.bounds pixels'
-                Left err -> putStrLn $ "Unable to decode: " <> show err
-        ["decode", inFile, outFile] -> do
-           bs <- mmapFileByteString inFile Nothing
-           case decodeQoi bs of
-                Left err -> putStrLn $ "Unable to decode: " <> show err
-                Right (header, pixels) -> void $ writeDynamicPng outFile $ toImage header pixels
-        ["encode_raw", inFile, width, height] -> do
-           bs <- mmapFileByteString inFile Nothing
-           let w' = read width
-               h' = read height
-               chans = fromIntegral $ fromIntegral (BS.length bs) `div` w' `div` h'
-           print $ A.bounds $ encodeRaw (Header matchASCII w' h' chans 0) bs 0
-        ["encode_raw", inFile, width, height, outFile] -> do
-           bs <- mmapFileByteString inFile Nothing
-           let w' = read width
-               h' = read height
-               chans = fromIntegral $ fromIntegral (BS.length bs) `div` w' `div` h'
-           dumpUArray outFile $ encodeRaw (Header matchASCII w' h' chans 0) bs 0
+  \case (cmd : inFile : rest) -> do
+          bs <- mmapFileByteString inFile Nothing
+          case (cmd, rest) of
+               ("decode", []) -> do
+                  case decodeQoi bs of
+                       Right (header, pixels) -> do print header
+                                                    case pixels of
+                                                         Pixels3 pixels' -> print $ A.bounds pixels'
+                                                         Pixels4 pixels' -> print $ A.bounds pixels'
+                       Left err -> putStrLn $ "Unable to decode: " <> show err
+               ("decode", [outFile]) -> do
+                  case decodeQoi bs of
+                       Left err -> putStrLn $ "Unable to decode: " <> show err
+                       Right (header, pixels) -> void $ writeDynamicPng outFile $ toImage header pixels
+               ("encode_raw", [width, height]) -> do
+                  let w' = read width
+                      h' = read height
+                      chans = fromIntegral $ fromIntegral (BS.length bs) `div` w' `div` h'
+                  print $ A.bounds $ encodeRaw (Header matchASCII w' h' chans 0) bs 0
+               ("encode_raw", [width, height, outFile]) -> do
+                  let w' = read width
+                      h' = read height
+                      chans = fromIntegral $ fromIntegral (BS.length bs) `div` w' `div` h'
+                  dumpUArray outFile $ encodeRaw (Header matchASCII w' h' chans 0) bs 0
+               _ -> putStrLn "Wrong usage"
         _ -> putStrLn "Wrong usage"
